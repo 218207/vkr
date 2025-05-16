@@ -20,64 +20,50 @@
 //     const [showDeleteModal, setShowDeleteModal] = useState(false); // Новое состояние для модального окна
 
 //     useEffect(() => {
-//         // const fetchData = async () => {
-//         //     setLoading(true);
-//         //     setError(null);
-            
-//         //     try {
-//         //         // Загрузка информации о квартире
-//         //         const response = await apartmentService.getApartment(id);
-//         //         setApartment(response.data);
-                
-//         //         // Загрузка похожих квартир
-//         //         const similarResponse = await recommendationService.getSimilarApartments(id);
-//         //         setSimilarApartments(similarResponse.data);
-                
-//         //         // Если пользователь авторизован, загружаем избранное
-//         //         if (isAuthenticated) {
-//         //             const favoritesResponse = await favoriteService.getFavorites();
-//         //             const favoriteIds = favoritesResponse.data.map(apt => apt.id);
-//         //             setFavorites(favoriteIds);
-//         //             setIsFavorite(favoriteIds.includes(Number(id)));
-//         //         }
-//         //     } catch (error) {
-//         //         console.error('Ошибка при загрузке данных:', error);
-//         //         setError('Не удалось загрузить информацию о квартире. Пожалуйста, попробуйте позже.');
-//         //     } finally {
-//         //         setLoading(false);
-//         //     }
-//         // };
-
 //         const fetchData = async () => {
 //             setLoading(true);
 //             setError(null);
-    
+            
 //             try {
 //                 // Загрузка информации о квартире
 //                 const response = await apartmentService.getApartment(id);
 //                 setApartment(response.data);
-        
-//                 // Закомментируйте или удалите запрос на получение похожих квартир
-//                 // const similarResponse = await recommendationService.getSimilarApartments(id);
-//                 // setSimilarApartments(similarResponse.data);
-        
-//                 // Установите пустой массив для похожих квартир
-//                 setSimilarApartments([]);
-        
+                
 //                 // Если пользователь авторизован, загружаем избранное
 //                 if (isAuthenticated) {
-//                     const favoritesResponse = await favoriteService.getFavorites();
-//                     const favoriteIds = favoritesResponse.data.map(apt => apt.id);
-//                     setFavorites(favoriteIds);
-//                     setIsFavorite(favoriteIds.includes(Number(id)));
+//                     try {
+//                         const favoritesResponse = await favoriteService.getFavorites();
+//                         const favoriteIds = favoritesResponse.data.map(apt => apt.id);
+//                         setFavorites(favoriteIds);
+//                         setIsFavorite(favoriteIds.includes(Number(id)));
+//                     } catch (favError) {
+//                         console.error('Ошибка при загрузке избранного:', favError);
+//                         // Игнорируем ошибку загрузки избранного
+//                     }
+//                 }
+                
+//                 // Загрузка похожих квартир
+//                 try {
+//                     const similarResponse = await recommendationService.getSimilarApartments(id);
+//                     setSimilarApartments(similarResponse.data);
+//                 } catch (recError) {
+//                     console.error('Ошибка при загрузке рекомендаций:', recError);
+//                     setSimilarApartments([]);
+//                     // Игнорируем ошибку загрузки рекомендаций
 //                 }
 //             } catch (error) {
 //                 console.error('Ошибка при загрузке данных:', error);
+//                 console.error('Детали ошибки:', {
+//                     response: error.response,
+//                     message: error.message,
+//                     status: error.response?.status,
+//                     data: error.response?.data
+//                 });
 //                 setError('Не удалось загрузить информацию о квартире. Пожалуйста, попробуйте позже.');
 //             } finally {
-//             setLoading(false);
-//         }
-// };
+//                 setLoading(false);
+//             }
+//         };
 
 //         fetchData();
 //     }, [id, isAuthenticated]);
@@ -132,6 +118,9 @@
 
 //     // Форматирование цены
 //     const formatPrice = (price) => {
+//         if (price === undefined || price === null) {
+//             return '0';
+//         }
 //         return new Intl.NumberFormat('ru-RU').format(price);
 //     };
 
@@ -421,7 +410,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { Container, Row, Col, Card, Badge, Button, Spinner, Alert, Carousel, Modal } from 'react-bootstrap';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
-import { apartmentService, favoriteService, recommendationService } from '../services/api';
+import { apartmentService, favoriteService, recommendationService, authService } from '../services/api';
 import ApartmentCard from '../components/ApartmentCard';
 
 const ApartmentDetailPage = () => {
@@ -430,13 +419,14 @@ const ApartmentDetailPage = () => {
     const { user, isAuthenticated } = useContext(AuthContext);
     
     const [apartment, setApartment] = useState(null);
+    const [owner, setOwner] = useState(null);
     const [similarApartments, setSimilarApartments] = useState([]);
     const [favorites, setFavorites] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [isFavorite, setIsFavorite] = useState(false);
     const [toggleFavoriteLoading, setToggleFavoriteLoading] = useState(false);
-    const [showDeleteModal, setShowDeleteModal] = useState(false); // Новое состояние для модального окна
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -447,6 +437,17 @@ const ApartmentDetailPage = () => {
                 // Загрузка информации о квартире
                 const response = await apartmentService.getApartment(id);
                 setApartment(response.data);
+                
+                // Загрузка информации о владельце
+                try {
+                    // Здесь мы просто предполагаем, что у вас есть API для получения данных пользователя по ID
+                    // Если такого метода нет, вы можете добавить его в authService или другой подходящий сервис
+                    const ownerResponse = await authService.getUserById(response.data.owner_id);
+                    setOwner(ownerResponse.data);
+                } catch (ownerError) {
+                    console.error('Ошибка при загрузке информации о владельце:', ownerError);
+                    // Не устанавливаем ошибку здесь, так как это некритично для отображения страницы
+                }
                 
                 // Если пользователь авторизован, загружаем избранное
                 if (isAuthenticated) {
@@ -702,7 +703,7 @@ const ApartmentDetailPage = () => {
                 </Col>
 
                 <Col lg={4}>
-                    {/* Информация о цене */}
+                    {/* Информация о цене и владельце */}
                     <Card className="shadow-sm mb-4">
                         <Card.Body>
                             <div className="d-flex justify-content-between align-items-start mb-3">
@@ -725,30 +726,22 @@ const ApartmentDetailPage = () => {
                                 <div className="text-muted mb-1">Дата публикации</div>
                                 <div className="fw-bold">{formatDate(apartment.created_at)}</div>
                             </div>
-                            <div className="d-grid gap-2 mt-4">
-                                <Button variant="primary">
-                                    Связаться с владельцем
-                                </Button>
-                                <Button variant="outline-secondary">
-                                    Запросить просмотр
-                                </Button>
+                            
+                            {/* Информация о владельце */}
+                            <div className="mb-3">
+                                <div className="text-muted mb-1">Владелец</div>
+                                <div className="fw-bold">
+                                    {owner ? owner.username : 'Админ'}
+                                </div>
                             </div>
-                        </Card.Body>
-                    </Card>
-                    
-                    {/* Карта с расположением */}
-                    <Card className="shadow-sm mb-4">
-                        <Card.Img 
-                            variant="top" 
-                            src={`https://maps.googleapis.com/maps/api/staticmap?center=Moscow,${apartment.metro}&zoom=14&size=400x300&key=YOUR_GOOGLE_MAPS_API_KEY`} 
-                            alt="Карта расположения"
-                        />
-                        <Card.Body>
-                            <Card.Title>Расположение</Card.Title>
-                            <Card.Text>
-                                <i className="bi bi-geo-alt me-2"></i>
-                                Москва, метро {apartment.metro}
-                            </Card.Text>
+                            {owner && (
+                                <div className="mb-3">
+                                    <div className="text-muted mb-1">Email для связи</div>
+                                    <div className="fw-bold">
+                                        <a href={`mailto:${owner.email}`}>{owner.email}</a>
+                                    </div>
+                                </div>
+                            )}
                         </Card.Body>
                     </Card>
                 </Col>

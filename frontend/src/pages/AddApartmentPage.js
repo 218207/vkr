@@ -1,13 +1,15 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { Container, Form, Button, Card, Alert, Spinner, Row, Col } from 'react-bootstrap';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { apartmentService } from '../services/api';
 import PricePredictor from '../components/PricePredictor';
 
 const AddApartmentPage = () => {
-    const { isAuthenticated } = useContext(AuthContext);
+    const { isAuthenticated, user } = useContext(AuthContext);
     const navigate = useNavigate();
+    const { id } = useParams(); // Получаем id из URL, если есть
+    const isEditMode = !!id; // Если есть id, то мы в режиме редактирования
     
     const [formData, setFormData] = useState({
         metro: '',
@@ -25,21 +27,86 @@ const AddApartmentPage = () => {
     });
     
     const [loading, setLoading] = useState(false);
+    const [initialLoading, setInitialLoading] = useState(isEditMode); // Начальная загрузка данных квартиры при редактировании
     const [error, setError] = useState(null);
     const [showPricePredictor, setShowPricePredictor] = useState(false);
+
+    // Загрузка данных квартиры при редактировании
+    useEffect(() => {
+        const fetchApartmentData = async () => {
+            if (isEditMode) {
+                try {
+                    const response = await apartmentService.getApartment(id);
+                    const apartment = response.data;
+                    
+                    // Заполняем форму данными квартиры
+                    setFormData({
+                        metro: apartment.metro || '',
+                        price: apartment.price?.toString() || '',
+                        minutes: apartment.minutes?.toString() || '',
+                        way: apartment.way || 'пешком',
+                        provider: apartment.provider || '',
+                        fee_percent: apartment.fee_percent?.toString() || '0',
+                        storey: apartment.storey?.toString() || '',
+                        storeys: apartment.storeys?.toString() || '',
+                        rooms: apartment.rooms?.toString() || '',
+                        total_area: apartment.total_area?.toString() || '',
+                        living_area: apartment.living_area?.toString() || '',
+                        kitchen_area: apartment.kitchen_area?.toString() || ''
+                    });
+                } catch (error) {
+                    console.error('Ошибка при загрузке данных квартиры:', error);
+                    setError('Не удалось загрузить данные квартиры для редактирования.');
+                } finally {
+                    setInitialLoading(false);
+                }
+            }
+        };
+
+        fetchApartmentData();
+    }, [id, isEditMode]);
 
     // Проверяем авторизацию
     if (!isAuthenticated) {
         return (
             <Container className="py-5">
                 <Alert variant="warning">
-                    Для добавления квартиры необходимо авторизоваться.
+                    Для {isEditMode ? 'редактирования' : 'добавления'} квартиры необходимо авторизоваться.
                 </Alert>
                 <Button 
                     variant="primary" 
-                    onClick={() => navigate('/login', { state: { from: '/add-apartment' } })}
+                    onClick={() => navigate('/login', { state: { from: isEditMode ? `/apartments/${id}/edit` : '/add-apartment' } })}
                 >
                     Войти
+                </Button>
+            </Container>
+        );
+    }
+
+    // Проверяем загрузку при редактировании
+    if (initialLoading) {
+        return (
+            <Container className="py-5 text-center">
+                <Spinner animation="border" role="status">
+                    <span className="visually-hidden">Загрузка...</span>
+                </Spinner>
+            </Container>
+        );
+    }
+
+    // Проверяем, что пользователь является владельцем при редактировании
+    // Эту проверку нужно сделать после загрузки данных, чтобы мы знали, кто владелец
+    if (isEditMode && !error && formData.owner_id && user && formData.owner_id !== user.id) {
+        return (
+            <Container className="py-5">
+                <Alert variant="danger">
+                    У вас нет прав на редактирование этой квартиры.
+                </Alert>
+                <Button 
+                    variant="primary" 
+                    onClick={() => navigate(`/apartments/${id}`)}
+                >
+                    Вернуться к просмотру
                 </Button>
             </Container>
         );
@@ -75,14 +142,20 @@ const AddApartmentPage = () => {
                 kitchen_area: formData.kitchen_area ? parseFloat(formData.kitchen_area) : null
             };
 
-            // Отправка запроса на создание квартиры
-            const response = await apartmentService.createApartment(dataToSend);
+            let response;
+            if (isEditMode) {
+                // Отправка запроса на обновление квартиры
+                response = await apartmentService.updateApartment(id, dataToSend);
+            } else {
+                // Отправка запроса на создание квартиры
+                response = await apartmentService.createApartment(dataToSend);
+            }
             
-            // Перенаправление на страницу просмотра созданной квартиры
-            navigate(`/apartments/${response.data.id}`);
+            // Перенаправление на страницу просмотра квартиры
+            navigate(`/apartments/${isEditMode ? id : response.data.id}`);
         } catch (error) {
-            console.error('Ошибка при создании квартиры:', error);
-            setError(error.response?.data?.detail || 'Не удалось создать объявление. Пожалуйста, проверьте введенные данные.');
+            console.error(`Ошибка при ${isEditMode ? 'обновлении' : 'создании'} квартиры:`, error);
+            setError(error.response?.data?.detail || `Не удалось ${isEditMode ? 'обновить' : 'создать'} объявление. Пожалуйста, проверьте введенные данные.`);
         } finally {
             setLoading(false);
         }
@@ -90,7 +163,7 @@ const AddApartmentPage = () => {
 
     return (
         <Container className="py-4">
-            <h1 className="mb-4">Добавление новой квартиры</h1>
+            <h1 className="mb-4">{isEditMode ? 'Редактирование' : 'Добавление новой'} квартиры</h1>
             
             {error && (
                 <Alert variant="danger">{error}</Alert>
@@ -307,10 +380,10 @@ const AddApartmentPage = () => {
                                                     aria-hidden="true"
                                                     className="me-2"
                                                 />
-                                                Создание объявления...
+                                                {isEditMode ? 'Обновление...' : 'Создание объявления...'}
                                             </>
                                         ) : (
-                                            'Опубликовать объявление'
+                                            isEditMode ? 'Сохранить изменения' : 'Опубликовать объявление'
                                         )}
                                     </Button>
                                 </div>

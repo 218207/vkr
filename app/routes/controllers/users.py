@@ -61,3 +61,20 @@ def update_user_me(
     """
     user = user_repository.update(db, db_obj=current_user, obj_in=user_in)
     return user
+
+@router.get("/{user_id}", response_model=UserSchema)
+def read_user(
+    *,
+    db: Session = Depends(get_db),
+    user_id: int,
+) -> Any:
+    """
+    Получение информации о пользователе по ID
+    """
+    user = user_repository.get(db, id=user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Пользователь не найден",
+        )
+    return user

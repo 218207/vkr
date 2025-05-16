@@ -57,11 +57,20 @@ api.interceptors.response.use(
 // Функции для работы с API
 
 // Аутентификация и пользователи
+// const authService = {
+//     login: (credentials) => api.post('/auth/login', credentials),
+//     register: (userData) => api.post('/users/', userData),
+//     getCurrentUser: () => api.get('/users/me'),
+//     updateProfile: (userData) => api.patch('/users/me', userData),
+// };
+
+// Аутентификация и пользователи
 const authService = {
     login: (credentials) => api.post('/auth/login', credentials),
     register: (userData) => api.post('/users/', userData),
     getCurrentUser: () => api.get('/users/me'),
     updateProfile: (userData) => api.patch('/users/me', userData),
+    getUserById: (id) => api.get(`/users/${id}`), // Новый метод для получения пользователя по ID
 };
 
 // Квартиры
@@ -101,3 +110,4 @@ export {
 };
 
 export default api;
+
