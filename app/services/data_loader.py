@@ -61,7 +61,6 @@ def load_apartments_from_csv(
                 
                 for row in reader:
                     # Пропускаем первый столбец (индекс) и используем остальные данные
-                    # Предполагаем, что порядок следующий: metro,price,minutes,way,provider,fee_percent,views,storey,storeys,rooms,total_area,living_area,kitchen_area
                     try:
                         apartment_data = {
                             "metro": row[1] if len(row) > 1 else "",

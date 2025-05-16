@@ -19,21 +19,6 @@ api.interceptors.request.use(
     }
 );
 
-// Добавляем перехватчик ответов для обработки ошибок авторизации
-// api.interceptors.response.use(
-//     (response) => {
-//         return response;
-//     },
-//     (error) => {
-//         if (error.response && error.response.status === 401) {
-//             // Если запрос не авторизован, удаляем токен и перенаправляем на страницу входа
-//             localStorage.removeItem('token');
-//             window.location.href = '/login';
-//         }
-//         return Promise.reject(error);
-//     }
-// );
-// Добавляем перехватчик ответов для более детальной отладки
 api.interceptors.response.use(
     response => {
         console.log(`Успешный ответ API: ${response.config.url}`, response.data);
@@ -54,15 +39,6 @@ api.interceptors.response.use(
         return Promise.reject(error);
     }
 );
-// Функции для работы с API
-
-// Аутентификация и пользователи
-// const authService = {
-//     login: (credentials) => api.post('/auth/login', credentials),
-//     register: (userData) => api.post('/users/', userData),
-//     getCurrentUser: () => api.get('/users/me'),
-//     updateProfile: (userData) => api.patch('/users/me', userData),
-// };
 
 // Аутентификация и пользователи
 const authService = {
